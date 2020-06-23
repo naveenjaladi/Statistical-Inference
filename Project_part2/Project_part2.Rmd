@@ -1,0 +1,148 @@
+---
+title: "Statistical Inference Course Project part 2"
+author: "Naveen Venkat Raj Jaladi"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+This report aims to analyze the ToothGrowth data in the R datasets package. Per the course project instructions, the following items should occur:
+
+1.Load the ToothGrowth data and perform some basic exploratory data analyses. 
+
+2.Provide a basic summary of the data.
+
+3.Using confidence intervals and/or hypothesis tests to compare tooth growth by supp and dose(Only use the techniques from class, even if there's other approaches worth considering).
+
+4.Stating conclusions and the assumptions needed from conclusions.
+
+## Exploratory Data Analysis
+
+Dataset description:
+
+The response is the length of odontoblasts (cells responsible for tooth growth) in 60 guinea pigs. Each animal received one of three dose levels of vitamin C (0.5, 1, and 2 mg/day) by one of two delivery methods, (orange juice or ascorbic acid (a form of vitamin C and coded as VC).
+
+Codebook:
+
+* len - numeric, Tooth length
+
+* supp - factor, Supplement type (VC or OJ).
+
+* dose - numeric, Dose in milligrams/day
+
+Load data and required packages:
+```{r loaddata, message=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(broom)
+options(tibble.width = Inf) 
+data("ToothGrowth")
+```
+
+Explore the dataset:
+```{r}
+glimpse(ToothGrowth)
+summary(ToothGrowth)
+```
+
+```{r}
+ToothGrowth$dose <- factor(ToothGrowth$dose)
+```
+
+Exploring variables via visualization:
+
+```{r fig1, echo=FALSE}
+ggplot(ToothGrowth, aes(x = dose, fill = supp)) + 
+     geom_bar() + 
+     labs(caption = "Figure 1", title = "Total counts of observations for each combination of dose and supplement type")
+```
+
+```{r fig2, echo=FALSE}
+ggplot(ToothGrowth, aes(x = len)) + 
+     geom_density(fill = "skyblue") + 
+     geom_vline(xintercept = mean(ToothGrowth$len), lty = "dashed") + 
+     annotate(geom = "text", x = mean(ToothGrowth$len), y = 0, label = "Mean") + 
+     labs(caption = "Figure 2", title = "Density of tooth length")
+```
+
+```{r fig3, echo=FALSE}
+ggplot(ToothGrowth, aes(x = dose, y = len, fill = supp)) +
+     geom_boxplot() + 
+     labs(caption = "Figure 3", title = "Compare tooth length vs. dose by supplement type")
+```
+
+## Hypothesis test
+
+In the previous step of exploratory data analysis we see that there is a obvious relationship between the dose levels of vitamin and tooth growth. Therefore we can say the dosage affects the tooth length. Also visualizations show us that supplement delivery method has no robust impacts on tooth length. 
+
+Let's calculate t-test for both groups. 
+
+1. Testing tooth growth by supplement delivery method:
+
+Null Hypothesis : different supplement types have no effect on tooth length
+
+```{r}
+t.result1 <- 
+     tidy(t.test(len~supp, data = ToothGrowth)) %>%
+     print()
+```
+
+Here We can not reject the Null Hypothesis, cause the Confidence interval contains zero and also the p.value (`r t.result1$p.value`) is greater than 0.05. 
+
+2. Testing tooth growth by dose:
+
+Null Hypothesis : dosage levels have no effect on tooth length
+
+We will compare doses 0.5 with 1, 1 with 2 and 2 with 0.5
+```{r}
+t.result2 <- 
+ToothGrowth %>% 
+     mutate(dose.group = "0.5-1") %>% 
+     bind_rows(ToothGrowth) %>% 
+     mutate(dose.group = if_else(is.na(dose.group), "1-2", dose.group)) %>%
+     bind_rows(ToothGrowth) %>% 
+     mutate(dose.group = if_else(is.na(dose.group), "2-0.5", dose.group)) %>%
+     filter((dose.group == "0.5-1" & dose %in% c(.5, 1)) |
+            (dose.group == "1-2" & dose %in% c(1, 2)) |
+            (dose.group == "2-0.5" & dose %in% c(2, .5))) %>%
+     select(-supp) %>%
+     group_by(dose.group) %>%
+     do(tidy(t.test(len~dose, data = .))) %>%
+     print()
+```
+The confidence intervals for these doses groups allow us to reject the Null Hypothesis.
+
+## Conclusion
+Given the following assumptions:
+
+* The sample is representative of the population.
+
+* The distribution of the sample means follows the Central Limit Theorem.
+
+In reviewing our t-test analysis from above, we can conclude that 
+
+* supplement delivery method has no effect on tooth growth/length.
+
+* however increased dosages do result in increased tooth length.
+
+## Appendices
+Code to plot Figure 1:
+```{r ref.label="fig1", eval=FALSE}
+```
+
+Code to plot Figure 2:
+```{r ref.label="fig2", eval=FALSE}
+```
+
+Code to plot Figure 3:
+```{r ref.label="fig3", eval=FALSE}
+```
